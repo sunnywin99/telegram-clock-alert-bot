@@ -33,6 +33,21 @@ memory via python-telegram-bot's `JobQueue` (APScheduler under the hood).
   minutes — **especially important for this project**: unlike the other
   bots, if Render's free instance spins down, reminders scheduled to fire
   during that window are simply missed/delayed, not just "slow to answer".
+- **2026-09-09: self-hosting support added.** Render's free 750hr/month pool
+  ran out (see [[project_third_desktop_server_plan]]), so the user is
+  migrating the always-on Telegram bots to a self-hosted **third desktop PC**
+  kept running at home. `bot.py` now calls `load_dotenv()` (added
+  `python-dotenv` to `requirements.txt`) so a local `.env` file (copy
+  `.env.example`) works alongside Render's existing dashboard env vars — no
+  behavior change on Render itself. New `run_bot.ps1` (logs to `bot.log`) and
+  `install_task.ps1` (Windows Scheduled Task as `SYSTEM`, `AtStartup`,
+  auto-restart) support running it persistently there. This bot's
+  already-accepted "reminders are lost on restart" tradeoff applies equally
+  to a server reboot on the third desktop — not a new limitation, just a new
+  place it can happen. **Migration not complete yet** — Render is still live
+  production; don't assume it moved until told the third desktop is
+  confirmed running and Render's service has been stopped (same-token
+  long-polling conflict otherwise).
 - Development happens on 第二台桌電 — see [[machine_setup]].
 - Telegram bot: **ClockAlertFromTeBot**, a bot the user had already created
   via @BotFather before asking for this feature (token supplied directly in
