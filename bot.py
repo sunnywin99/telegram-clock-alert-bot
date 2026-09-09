@@ -7,19 +7,22 @@ Render 免費方案保活用的健康檢查網址也在這裡。
     洗衣服 ok / 洗衣服 完成  → 停止「洗衣服」的提醒
     提醒時間 5          → 把重複提醒的間隔改成 5 分鐘（預設 10 分鐘，套用到所有進行中的提醒）
 
-環境變數（Render 的 Environment 頁籤設定）：
+環境變數（Render 的 Environment 頁籤設定，或本機/自架伺服器同資料夾的 .env 檔，見 .env.example）：
     TELEGRAM_BOT_TOKEN        跟 @BotFather 申請的 token
     ALLOWED_TELEGRAM_USER_ID  只允許這個 Telegram user id 的訊息被處理（防止別人亂用）
-    PORT                      Render 會自動設定，本機測試預設 8080
+    PORT                      Render 會自動設定；自架伺服器同時跑多個 bot 時要各自設不同埠號
 """
 import logging
 import os
 import threading
 from datetime import timedelta
 
+from dotenv import load_dotenv
 from flask import Flask
 from telegram import Update
 from telegram.ext import Application, ContextTypes, MessageHandler, filters
+
+load_dotenv()
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)

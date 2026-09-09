@@ -75,9 +75,31 @@ Render 免費 Web Service 閒置 15 分鐘沒有 HTTP 請求會自動休眠，�
 
 ---
 
+## 自架伺服器（第三台桌電）常駐執行
+
+不想依賴 Render 免費方案的話，可以把整個資料夾複製到常開機的電腦上，用 Windows
+的工作排程器讓它開機自動啟動、當掉自動重開：
+
+1. 複製 `.env.example` 改名成 `.env`，把步驟 2 表格裡那些值填進去（不要複製到別台
+   電腦時漏掉 `.env`，也不要把它 push 上 GitHub）。
+2. 如果同一台伺服器上還有跑其他 telegram bot，確認每個 bot 的 `.env` 裡 `PORT`
+   都不一樣（這個埠號只是本機健康檢查用，不用對外開放，也不用設定路由器）。
+3. 建好 `venv` 並 `pip install -r requirements.txt`（跟本機開發時的步驟一樣）。
+4. 用系統管理員身分開 PowerShell，執行 `.\install_task.ps1` 註冊排程工作。
+5. 執行 `Start-ScheduledTask -TaskName 'TelegramClockAlertBot'` 立即啟動一次，
+   到 Telegram 傳訊息測試；`bot.log` 可以看執行記錄。
+6. **確認沒問題後，記得到 Render 把這個服務關掉或刪除**——同一組
+   `TELEGRAM_BOT_TOKEN` 不能兩邊同時長輪詢，不然兩邊都會收到 409 衝突錯誤、
+   提醒時有時無。
+7. 記得「已知限制」那條：伺服器重開機一樣會清空進行中的提醒。
+
+移除排程工作：`Unregister-ScheduledTask -TaskName "TelegramClockAlertBot" -Confirm:$false`
+
+---
+
 ## 已知限制
 
-- 提醒狀態存在記憶體中，**不會持久化**：如果 Render 重新部署或程序重啟，
+- 提醒狀態存在記憶體中，**不會持久化**：如果 Render 重新部署、伺服器重開機或程序重啟，
   當時所有進行中的提醒都會消失（跟鬧鐘一樣，本來就是短期、一次性的用途，
   不像 trade-calc 或其他記帳類機器人需要長期保存資料）。
 - 只要 UptimeRobot 持續保活、程序沒有重啟，排定的提醒就會準時。
@@ -87,13 +109,7 @@ Render 免費 Web Service 閒置 15 分鐘沒有 HTTP 請求會自動休眠，�
 - **機器人完全沒反應**：先確認 Render 的 Logs 頁籤有沒有錯誤訊息；再確認
   UptimeRobot 的 Monitor 狀態是 Up；`ALLOWED_TELEGRAM_USER_ID` 打錯也會讓
   機器人「已讀不回」（其實是回了「沒有權限」，但只回給你以外的人才看得到）。
-- **本機測試**：用 PowerShell 設定環境變數後直接執行：
-
-  ```powershell
-  $env:TELEGRAM_BOT_TOKEN = "..."
-  $env:ALLOWED_TELEGRAM_USER_ID = "..."
-  python bot.py
-  ```
-
-  測試完記得先停掉本機程序再部署到 Render，避免同一個 token 本機跟雲端
-  同時長輪詢造成衝突。
+- **本機測試**：把 `.env.example` 複製成 `.env` 填好值後，
+  直接 `.\venv\Scripts\python bot.py` 就能在本機跑。測試完記得先停掉本機程序
+  再部署到 Render，避免同一個 token 本機跟雲端同時長輪詢造成衝突。
+- **自架伺服器常駐執行**：見上面「自架伺服器（第三台桌電）常駐執行」。
