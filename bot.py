@@ -15,7 +15,8 @@ Render 免費方案保活用的健康檢查網址也在這裡。
 import logging
 import os
 import threading
-from datetime import timedelta
+from datetime import time, timedelta
+from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 from flask import Flask
@@ -31,14 +32,23 @@ TELEGRAM_BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 ALLOWED_TELEGRAM_USER_ID = int(os.environ["ALLOWED_TELEGRAM_USER_ID"])
 PORT = int(os.environ.get("PORT", "8080"))
 
+TIMEZONE = ZoneInfo("Asia/Taipei")
+
 DEFAULT_INTERVAL_MINUTES = 10
 INTERVAL_TASK_NAME = "提醒時間"
 DONE_WORDS = {"ok", "OK", "Ok", "完成"}
 
+WATER_REMINDER_NAME = "喝水提醒"
+WATER_REMINDER_HOURS = range(7, 21)  # 7:00 ~ 20:00，整點各一次
+WATER_REMINDER_TEXT = "喝水提醒：該喝水了，喝 150cc 水。"
+ON_WORDS = {"開", "開啟", "on", "On", "ON"}
+OFF_WORDS = {"關", "關閉", "off", "Off", "OFF"}
+
 # 進行中的提醒：{事項名稱: {"job": Job, "initial_minutes": int, "chat_id": int}}
 active_reminders: dict[str, dict] = {}
 # 重複提醒間隔（分鐘），"提醒時間 N" 會改這個值，套用到所有進行中與之後的提醒
-settings = {"interval_minutes": DEFAULT_INTERVAL_MINUTES}
+# 喝水提醒開關（預設開啟），"喝水提醒 開／關" 會改這個值
+settings = {"interval_minutes": DEFAULT_INTERVAL_MINUTES, "water_reminder_enabled": True}
 
 USAGE_TEXT = (
     "這是事項提醒（鬧鐘）機器人，用法：\n\n"
@@ -49,7 +59,9 @@ USAGE_TEXT = (
     "洗衣服 完成\n\n"
     f"改重複提醒間隔（預設 {DEFAULT_INTERVAL_MINUTES} 分鐘）：傳「提醒時間 分鐘數」，例如：\n"
     "提醒時間 5\n"
-    "→ 之後每 5 分鐘催一次（立刻套用到所有進行中的提醒）。"
+    "→ 之後每 5 分鐘催一次（立刻套用到所有進行中的提醒）。\n\n"
+    "喝水提醒：預設開啟，每天 7:00~20:00 整點提醒喝 150cc 水，傳「喝水提醒 關」關閉、"
+    "「喝水提醒 開」重新開啟。"
 )
 
 
@@ -138,6 +150,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"已將重複提醒間隔改成每 {action} 分鐘。")
         return
 
+    if name == WATER_REMINDER_NAME:
+        if action in ON_WORDS:
+            settings["water_reminder_enabled"] = True
+            await update.message.reply_text("喝水提醒已開啟，每天 7:00~20:00 整點會提醒喝 150cc 水。")
+        elif action in OFF_WORDS:
+            settings["water_reminder_enabled"] = False
+            await update.message.reply_text("喝水提醒已關閉。")
+        else:
+            await update.message.reply_text("「喝水提醒」後面要接「開」或「關」，例如「喝水提醒 關」。")
+        return
+
     if action in DONE_WORDS:
         if name in active_reminders:
             _cancel_job(name)
@@ -155,6 +178,22 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("看不懂這個指令。\n\n" + USAGE_TEXT)
 
 
+async def _on_water_reminder(context: ContextTypes.DEFAULT_TYPE):
+    if not settings["water_reminder_enabled"]:
+        return
+    await context.bot.send_message(chat_id=context.job.data["chat_id"], text=WATER_REMINDER_TEXT)
+
+
+def _schedule_water_reminders(app: Application):
+    for hour in WATER_REMINDER_HOURS:
+        app.job_queue.run_daily(
+            _on_water_reminder,
+            time=time(hour=hour, minute=0, tzinfo=TIMEZONE),
+            data={"chat_id": ALLOWED_TELEGRAM_USER_ID},
+            name=f"water:{hour}",
+        )
+
+
 def _run_health_check_server():
     app = Flask(__name__)
 
@@ -170,6 +209,7 @@ def main():
 
     application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
     application.add_handler(MessageHandler(filters.TEXT, handle_message))
+    _schedule_water_reminders(application)
 
     logger.info("機器人啟動，開始長輪詢...")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
