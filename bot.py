@@ -44,6 +44,20 @@ WATER_REMINDER_TEXT = "喝水提醒：該喝水了，喝 150cc 水。"
 ON_WORDS = {"開", "開啟", "on", "On", "ON"}
 OFF_WORDS = {"關", "關閉", "off", "Off", "OFF"}
 
+MONDAY_TO_SATURDAY = (0, 1, 2, 3, 4, 5)  # run_daily 的 days：0=週一...6=週日
+
+# 每天固定時間的作息提醒：(key, 訊息, 時, 分, 星期幾要發／None 代表每天)
+FIXED_REMINDERS = [
+    ("wake_up", "起床時間到了！", 5, 0, None),
+    ("meditate_morning", "打坐提醒：打坐三十分鐘。", 5, 25, None),
+    ("breakfast", "準備早餐時間到了！", 6, 0, None),
+    ("jog", "超慢跑時間到了，跑30分鐘。", 6, 40, None),
+    ("lunchbox", "包素食便當時間到了！", 11, 25, MONDAY_TO_SATURDAY),
+    ("wind_down", "該關手機及電腦，準備睡覺了。", 20, 0, None),
+    ("meditate_night", "打坐提醒：打坐三十分鐘。", 21, 25, None),
+    ("sleep", "睡覺時間到了！", 22, 0, None),
+]
+
 # 進行中的提醒：{事項名稱: {"job": Job, "initial_minutes": int, "chat_id": int}}
 active_reminders: dict[str, dict] = {}
 # 重複提醒間隔（分鐘），"提醒時間 N" 會改這個值，套用到所有進行中與之後的提醒
@@ -61,7 +75,11 @@ USAGE_TEXT = (
     "提醒時間 5\n"
     "→ 之後每 5 分鐘催一次（立刻套用到所有進行中的提醒）。\n\n"
     "喝水提醒：預設開啟，每天 7:00~20:00 整點提醒喝 150cc 水，傳「喝水提醒 關」關閉、"
-    "「喝水提醒 開」重新開啟。"
+    "「喝水提醒 開」重新開啟。\n\n"
+    "每日作息提醒（固定，無法關閉）：\n"
+    "05:00 起床／05:25 打坐三十分鐘／06:00 準備早餐／06:40 超慢跑30分鐘／\n"
+    "11:25 包素食便當（週一~週六）／20:00 關手機及電腦準備睡覺／\n"
+    "21:25 打坐三十分鐘／22:00 睡覺"
 )
 
 
@@ -194,6 +212,22 @@ def _schedule_water_reminders(app: Application):
         )
 
 
+async def _on_fixed_reminder(context: ContextTypes.DEFAULT_TYPE):
+    await context.bot.send_message(chat_id=context.job.data["chat_id"], text=context.job.data["text"])
+
+
+def _schedule_fixed_reminders(app: Application):
+    for key, text_, hour, minute, days in FIXED_REMINDERS:
+        kwargs = dict(
+            time=time(hour=hour, minute=minute, tzinfo=TIMEZONE),
+            data={"chat_id": ALLOWED_TELEGRAM_USER_ID, "text": text_},
+            name=f"fixed:{key}",
+        )
+        if days is not None:
+            kwargs["days"] = days
+        app.job_queue.run_daily(_on_fixed_reminder, **kwargs)
+
+
 def _run_health_check_server():
     app = Flask(__name__)
 
@@ -210,6 +244,7 @@ def main():
     application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
     application.add_handler(MessageHandler(filters.TEXT, handle_message))
     _schedule_water_reminders(application)
+    _schedule_fixed_reminders(application)
 
     logger.info("機器人啟動，開始長輪詢...")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
