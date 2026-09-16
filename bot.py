@@ -39,7 +39,9 @@ INTERVAL_TASK_NAME = "提醒時間"
 DONE_WORDS = {"ok", "OK", "Ok", "完成"}
 
 WATER_REMINDER_NAME = "喝水提醒"
-WATER_REMINDER_HOURS = range(7, 21)  # 7:00 ~ 20:00，整點各一次
+# 7:00~20:00 整點各一次，但排除三餐剛吃飽的時段（8~9點、12~13點、18~19點）不適合喝太多水
+WATER_REMINDER_SKIP_HOURS = {8, 9, 12, 13, 18, 19}
+WATER_REMINDER_HOURS = [h for h in range(7, 21) if h not in WATER_REMINDER_SKIP_HOURS]
 WATER_REMINDER_TEXT = "喝水提醒：該喝水了，喝 150cc 水。"
 ON_WORDS = {"開", "開啟", "on", "On", "ON"}
 OFF_WORDS = {"關", "關閉", "off", "Off", "OFF"}
@@ -74,8 +76,8 @@ USAGE_TEXT = (
     f"改重複提醒間隔（預設 {DEFAULT_INTERVAL_MINUTES} 分鐘）：傳「提醒時間 分鐘數」，例如：\n"
     "提醒時間 5\n"
     "→ 之後每 5 分鐘催一次（立刻套用到所有進行中的提醒）。\n\n"
-    "喝水提醒：預設開啟，每天 7:00~20:00 整點提醒喝 150cc 水，傳「喝水提醒 關」關閉、"
-    "「喝水提醒 開」重新開啟。\n\n"
+    "喝水提醒：預設開啟，每天 7:00~20:00 整點提醒喝 150cc 水（8~9點、12~13點、18~19點"
+    "剛吃飽飯不提醒），傳「喝水提醒 關」關閉、「喝水提醒 開」重新開啟。\n\n"
     "每日作息提醒（固定，無法關閉）：\n"
     "05:00 起床／05:25 打坐三十分鐘／06:00 準備早餐／06:40 超慢跑30分鐘／\n"
     "11:25 包素食便當（週一~週六）／20:00 關手機及電腦準備睡覺／\n"
