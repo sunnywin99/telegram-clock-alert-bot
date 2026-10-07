@@ -39,9 +39,10 @@ INTERVAL_TASK_NAME = "提醒時間"
 DONE_WORDS = {"ok", "OK", "Ok", "完成"}
 
 WATER_REMINDER_NAME = "喝水提醒"
-# 7:10~20:10 每小時的 10 分各一次（不整點提醒），但排除三餐剛吃飽的時段（8~9點、12~13點、18~19點）不適合喝太多水
-WATER_REMINDER_SKIP_HOURS = {8, 9, 12, 13, 18, 19}
-WATER_REMINDER_HOURS = [h for h in range(7, 21) if h not in WATER_REMINDER_SKIP_HOURS]
+# 7:10~17:10 每小時的 10 分各一次（不整點提醒），但排除早餐、午餐剛吃飽的時段（8~9點、12~13點）不適合喝太多水；
+# 17:10 之後不再提醒（晚餐後、20 點要準備睡覺了）
+WATER_REMINDER_SKIP_HOURS = {8, 9, 12, 13}
+WATER_REMINDER_HOURS = [h for h in range(7, 18) if h not in WATER_REMINDER_SKIP_HOURS]
 WATER_REMINDER_MINUTE = 10
 WATER_REMINDER_TEXT = "喝水提醒：該喝水了，喝 150cc 水。"
 ON_WORDS = {"開", "開啟", "on", "On", "ON"}
@@ -77,7 +78,7 @@ USAGE_TEXT = (
     f"改重複提醒間隔（預設 {DEFAULT_INTERVAL_MINUTES} 分鐘）：傳「提醒時間 分鐘數」，例如：\n"
     "提醒時間 5\n"
     "→ 之後每 5 分鐘催一次（立刻套用到所有進行中的提醒）。\n\n"
-    "喝水提醒：預設開啟，每天 7:10~20:10 每小時的 10 分提醒喝 150cc 水（8~9點、12~13點、18~19點"
+    "喝水提醒：預設開啟，每天 7:10~17:10 每小時的 10 分提醒喝 150cc 水（8~9點、12~13點"
     "剛吃飽飯不提醒），傳「喝水提醒 關」關閉、「喝水提醒 開」重新開啟。\n\n"
     "每日作息提醒（固定，無法關閉）：\n"
     "05:00 起床／05:25 打坐三十分鐘／06:00 準備早餐／06:40 超慢跑30分鐘／\n"
@@ -174,7 +175,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if name == WATER_REMINDER_NAME:
         if action in ON_WORDS:
             settings["water_reminder_enabled"] = True
-            await update.message.reply_text("喝水提醒已開啟，每天 7:10~20:10 每小時的 10 分會提醒喝 150cc 水。")
+            await update.message.reply_text("喝水提醒已開啟，每天 7:10~17:10 每小時的 10 分會提醒喝 150cc 水。")
         elif action in OFF_WORDS:
             settings["water_reminder_enabled"] = False
             await update.message.reply_text("喝水提醒已關閉。")
