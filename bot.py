@@ -39,9 +39,10 @@ INTERVAL_TASK_NAME = "提醒時間"
 DONE_WORDS = {"ok", "OK", "Ok", "完成"}
 
 WATER_REMINDER_NAME = "喝水提醒"
-# 7:00~20:00 整點各一次，但排除三餐剛吃飽的時段（8~9點、12~13點、18~19點）不適合喝太多水
+# 7:10~20:10 每小時的 10 分各一次（不整點提醒），但排除三餐剛吃飽的時段（8~9點、12~13點、18~19點）不適合喝太多水
 WATER_REMINDER_SKIP_HOURS = {8, 9, 12, 13, 18, 19}
 WATER_REMINDER_HOURS = [h for h in range(7, 21) if h not in WATER_REMINDER_SKIP_HOURS]
+WATER_REMINDER_MINUTE = 10
 WATER_REMINDER_TEXT = "喝水提醒：該喝水了，喝 150cc 水。"
 ON_WORDS = {"開", "開啟", "on", "On", "ON"}
 OFF_WORDS = {"關", "關閉", "off", "Off", "OFF"}
@@ -55,9 +56,9 @@ FIXED_REMINDERS = [
     ("breakfast", "準備早餐時間到了！", 6, 0, None),
     ("jog", "超慢跑時間到了，跑30分鐘。", 6, 40, None),
     ("lunchbox", "包素食便當時間到了！", 11, 25, MONDAY_TO_SATURDAY),
-    ("wind_down", "該關手機及電腦，準備睡覺了。", 20, 0, None),
+    ("wind_down", "該關手機及電腦，準備睡覺了。", 20, 10, None),
     ("meditate_night", "打坐提醒：打坐三十分鐘。", 21, 25, None),
-    ("sleep", "睡覺時間到了！", 22, 0, None),
+    ("sleep", "睡覺時間到了！", 22, 10, None),
 ]
 
 # 進行中的提醒：{事項名稱: {"job": Job, "initial_minutes": int, "chat_id": int}}
@@ -76,12 +77,12 @@ USAGE_TEXT = (
     f"改重複提醒間隔（預設 {DEFAULT_INTERVAL_MINUTES} 分鐘）：傳「提醒時間 分鐘數」，例如：\n"
     "提醒時間 5\n"
     "→ 之後每 5 分鐘催一次（立刻套用到所有進行中的提醒）。\n\n"
-    "喝水提醒：預設開啟，每天 7:00~20:00 整點提醒喝 150cc 水（8~9點、12~13點、18~19點"
+    "喝水提醒：預設開啟，每天 7:10~20:10 每小時的 10 分提醒喝 150cc 水（8~9點、12~13點、18~19點"
     "剛吃飽飯不提醒），傳「喝水提醒 關」關閉、「喝水提醒 開」重新開啟。\n\n"
     "每日作息提醒（固定，無法關閉）：\n"
     "05:00 起床／05:25 打坐三十分鐘／06:00 準備早餐／06:40 超慢跑30分鐘／\n"
-    "11:25 包素食便當（週一~週六）／20:00 關手機及電腦準備睡覺／\n"
-    "21:25 打坐三十分鐘／22:00 睡覺"
+    "11:25 包素食便當（週一~週六）／20:10 關手機及電腦準備睡覺／\n"
+    "21:25 打坐三十分鐘／22:10 睡覺"
 )
 
 
@@ -173,7 +174,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if name == WATER_REMINDER_NAME:
         if action in ON_WORDS:
             settings["water_reminder_enabled"] = True
-            await update.message.reply_text("喝水提醒已開啟，每天 7:00~20:00 整點會提醒喝 150cc 水。")
+            await update.message.reply_text("喝水提醒已開啟，每天 7:10~20:10 每小時的 10 分會提醒喝 150cc 水。")
         elif action in OFF_WORDS:
             settings["water_reminder_enabled"] = False
             await update.message.reply_text("喝水提醒已關閉。")
@@ -208,7 +209,7 @@ def _schedule_water_reminders(app: Application):
     for hour in WATER_REMINDER_HOURS:
         app.job_queue.run_daily(
             _on_water_reminder,
-            time=time(hour=hour, minute=0, tzinfo=TIMEZONE),
+            time=time(hour=hour, minute=WATER_REMINDER_MINUTE, tzinfo=TIMEZONE),
             data={"chat_id": ALLOWED_TELEGRAM_USER_ID},
             name=f"water:{hour}",
         )
