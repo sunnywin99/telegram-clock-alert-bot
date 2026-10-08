@@ -1,6 +1,6 @@
 ---
 name: telegram-clock-alert-bot
-description: Background and feature spec for telegram-clock-alert-bot — a Python service that lets the user text a Telegram bot "事項 分鐘數" (e.g. 洗衣服 60) to start a repeating reminder, which fires once after that many minutes and then re-fires every N minutes (default 10, adjustable via 提醒時間 N) until the user replies "事項 ok" or "事項 完成". Pure Telegram interaction, no external account/Google integration. Use when the user references "telegram-clock-alert-bot", 「事項提醒」/「鬧鐘機器人」, ClockAlertFromTeBot, asks to continue/resume work on it, or asks what this project is / where it lives.
+description: Background and feature spec for telegram-clock-alert-bot — a Python service that lets the user text a Telegram bot "事項 分鐘數" (e.g. 洗衣服 60) to start a repeating reminder, which fires once after that many minutes and then re-fires every N minutes (default 10, adjustable via 提醒時間 N) until the user replies "事項 ok" or "事項 完成", plus fixed daily routine and water-drinking reminders. Pure Telegram interaction, no external account/Google integration. Use when the user references "telegram-clock-alert-bot", 「事項提醒」/「鬧鐘機器人」, ClockAlertFromTeBot, asks to continue/resume work on it, or asks what this project is / where it lives.
 user-invocable: true
 ---
 
@@ -16,7 +16,7 @@ gets reminded once after that many minutes, then nagged every N minutes
 (default 10) until they reply `事項 ok` or `事項 完成`. Sibling project to
 [[project_telegram_calendar_bot]], [[project_telegram_heartsutra_bot]], and
 [[project_telegram_relation_mark_bot]] — same Telegram-long-polling +
-Render + UptimeRobot skeleton, but **the only one of the four with no Google
+(originally) Render + UptimeRobot skeleton, but **the only one of the four with no Google
 Cloud/OAuth dependency at all**: state lives entirely in the process's
 memory via python-telegram-bot's `JobQueue` (APScheduler under the hood).
 
@@ -25,30 +25,25 @@ memory via python-telegram-bot's `JobQueue` (APScheduler under the hood).
 - GitHub: https://github.com/sunnywin99/telegram-clock-alert-bot (private)
 - `gh` (GitHub CLI) already authenticated on this machine under account
   `sunnywin99` — same account as [[project_trade_calc]].
-- Deploy target: **Render free Web Service** (Python backend, not a Claude
-  Artifact). **Deployed and live as of 2026-08-27**:
-  `https://telegram-clock-alert-bot.onrender.com` (service id
-  `srv-da7rrpqjnfac7397m8eg`, region Oregon). Kept alive via an UptimeRobot
-  HTTP(s) monitor hitting the Flask health-check route (`/`) every 5
-  minutes — **especially important for this project**: unlike the other
-  bots, if Render's free instance spins down, reminders scheduled to fire
-  during that window are simply missed/delayed, not just "slow to answer".
-- **2026-09-09: self-hosting support added.** Render's free 750hr/month pool
-  ran out (see [[project_third_desktop_server_plan]]), so the user is
-  migrating the always-on Telegram bots to a self-hosted **third desktop PC**
-  kept running at home. `bot.py` now calls `load_dotenv()` (added
-  `python-dotenv` to `requirements.txt`) so a local `.env` file (copy
-  `.env.example`) works alongside Render's existing dashboard env vars — no
-  behavior change on Render itself. New `run_bot.ps1` (logs to `bot.log`) and
-  `install_task.ps1` (Windows Scheduled Task as `SYSTEM`, `AtStartup`,
-  auto-restart) support running it persistently there. This bot's
-  already-accepted "reminders are lost on restart" tradeoff applies equally
-  to a server reboot on the third desktop — not a new limitation, just a new
-  place it can happen. **Migration not complete yet** — Render is still live
-  production; don't assume it moved until told the third desktop is
-  confirmed running and Render's service has been stopped (same-token
-  long-polling conflict otherwise).
-- Development happens on 第二台桌電 — see [[machine_setup]].
+- **Production: self-hosted third desktop PC** (Render is no longer used).
+  Repo lives at `C:\telegram-clock-alert-bot` on that machine, run by the
+  Windows Scheduled Task `TelegramClockAlertBot` (`install_task.ps1`:
+  `SYSTEM`, `AtStartup`, auto-restart) via `run_bot.ps1`, which logs to
+  `bot.log`. Env vars come from `.env` there (`load_dotenv()`).
+  - History: deployed to Render free tier on 2026-08-27 (kept awake by an
+    UptimeRobot monitor). Render's free 750hr/month pool ran out, so
+    self-hosting support was added 2026-09-09 (see
+    [[project_third_desktop_server_plan]]). The exact date Render was
+    stopped wasn't recorded; the 2026-09-14 commit already targets the
+    Windows self-hosted environment, so the move happened ~09-09..09-14.
+    The Render service and UptimeRobot monitor are no longer needed.
+  - Reminders in flight are lost whenever the desktop reboots or the task
+    is restarted (accepted tradeoff, see below).
+- **Development: Claude Code cloud sessions (since 2026-10-08)**, not the
+  second desktop's CLI. The desktop only runs the bot; it gets new code via
+  `git pull` + task restart (see workflow). Never edit files directly on the
+  desktop — uncommitted local edits there made `git pull` fail once
+  (resolved with `git stash`).
 - Telegram bot: **ClockAlertFromTeBot**, a bot the user had already created
   via @BotFather before asking for this feature (token supplied directly in
   chat, not created fresh by Claude this session — unlike the sibling bots'
@@ -60,8 +55,8 @@ memory via python-telegram-bot's `JobQueue` (APScheduler under the hood).
   changelog, this file is just an orientation summary.
 
 **Always re-read `bot.py` and run `git log --oneline` in the repo before
-making changes** — this file is a snapshot as of commit `fcd2166`
-(2026-08-27) and the code may have moved on since.
+making changes** — this file is a snapshot as of commit `161e703`
+(2026-10-08) and the code may have moved on since.
 
 ## Message format and design decisions
 
@@ -85,10 +80,26 @@ making changes** — this file is a snapshot as of commit `fcd2166`
 - **Multiple concurrent named reminders** are supported — `active_reminders`
   is a dict keyed by 事項 name, so `洗衣服 60` and `煮飯 30` running at the
   same time are independent.
-- State is **not persisted** — a Render redeploy or process restart loses
-  all in-flight reminders. Deliberate simplicity: alarms are inherently
+- State is **not persisted** — a desktop reboot or bot restart loses
+  all in-flight reminders, and resets the water toggle (on) and the repeat
+  interval (10). Deliberate simplicity: alarms are inherently
   short-lived/ephemeral, unlike the sibling bots' Google-Sheets-backed data
   which needs to survive indefinitely.
+
+- **Water reminder** (`喝水提醒`): sends 「喝水提醒：該喝水了，喝 150cc 水。」 at
+  minute 10 of hours 7, 10, 11, 14, 15, 16, 17 (`WATER_REMINDER_MINUTE`,
+  `range(7, 18)` minus `WATER_REMINDER_SKIP_HOURS = {8, 9, 12, 13}` — right
+  after breakfast/lunch; nothing after 17:10 so it never collides with the
+  20:10 wind-down). On by default; `喝水提醒 關/開` toggles
+  `settings["water_reminder_enabled"]`. The user explicitly does **not**
+  want on-the-hour reminders.
+- **Fixed daily routine** (`FIXED_REMINDERS`, no toggle, deliberately not
+  put in Google Calendar): 05:00 起床, 05:25 打坐, 06:00 準備早餐, 06:40 超慢跑,
+  11:25 包素食便當 (Mon–Sat only), 20:10 關手機及電腦準備睡覺, 21:25 打坐,
+  22:10 睡覺. Both water and routine reminders are `job_queue.run_daily`
+  jobs scheduled at startup to `ALLOWED_TELEGRAM_USER_ID`.
+- `/help` (`USAGE_TEXT`) lists all of the above — keep it in sync with any
+  time change, along with `README.md`.
 
 ## Architecture
 
@@ -112,18 +123,18 @@ _on_repeat_alert (fires repeatedly until cancelled)
 ```
 
 `bot.py` also runs a tiny Flask app (`/` → "telegram-clock-alert-bot is
-running") in a background thread purely so Render's free Web Service tier
-has an HTTP endpoint to consider "alive" — the actual bot logic is 100%
+running") in a background thread, left over from the Render days when the
+free Web Service tier needed an HTTP endpoint to consider "alive" — the actual bot logic is 100%
 Telegram long polling, no webhook. JobQueue requires the
 `python-telegram-bot[job-queue]` extra (pulls in `apscheduler`).
 
-### Environment variables (set in Render's dashboard, never committed)
+### Environment variables (`.env` on the desktop, never committed)
 
 | Key | Purpose |
 |---|---|
 | `TELEGRAM_BOT_TOKEN` | ClockAlertFromTeBot's token from @BotFather |
 | `ALLOWED_TELEGRAM_USER_ID` | Only this Telegram user id may control reminders (`8735906224`, same account as the sibling bots — get via @userinfobot) |
-| `PORT` | Set automatically by Render |
+| `PORT` | Health-check port, default 8080; set distinct values if several bots share the desktop |
 
 That's it — no Google credentials, no OAuth, no spreadsheet id. This is the
 simplest env-var footprint of any bot in this family.
@@ -131,42 +142,43 @@ simplest env-var footprint of any bot in this family.
 ## Working style for this project
 
 Same user as [[project_trade_calc]] and the other Telegram bots — expect
-Traditional Chinese only (see [[feedback_chinese_only]]). Local testing
-pattern: run `bot.py` locally with env vars set via the venv's Python,
-confirm a real Telegram round-trip, stop the local process before deploying
-to Render (avoids a `getUpdates` polling conflict between local + cloud on
-the same token). UptimeRobot's own dashboard
-(`dashboard.uptimerobot.com`) is known to hang under claude-in-chrome
-automation — the user sets that step up manually, same as the sibling bots.
-Render deploy itself (creating the Web Service, pasting env vars) **was**
-done via claude-in-chrome browser automation successfully in this project's
-first build — ask which connected machine's Chrome to use each time (see
-[[machine_setup]] for the current, corrected deviceId↔machine-name mapping).
+Traditional Chinese only (see [[feedback_chinese_only]]). The user is not a
+PowerShell expert: give exact commands to paste, and remember the scheduled
+task runs as `SYSTEM`, so stopping/starting it needs an **administrator**
+PowerShell (otherwise `HRESULT 0x80070005`). There is no
+`Restart-ScheduledTask` cmdlet. Two `python.exe` processes for `bot.py` is
+normal (the venv launcher spawns the real interpreter as a child).
+
+Note: `bot.log` contains the bot token, because httpx logs every
+`api.telegram.org/bot<TOKEN>/...` request URL at INFO level. Don't ask the
+user to paste raw log lines without warning them.
 
 ## When invoked
 
-1. Confirm the repo is still at `C:\claude_practicefiles\telegram-clock-alert-bot`
-   and check `git log --oneline -10` + skim `bot.py` to see what's changed
+1. Check `git log --oneline -10` + skim `bot.py` to see what's changed
    since this doc was written.
 2. Summarize current state / answer the user's question using the fresh
    info, not blindly from this file.
-3. If asked to continue development, every change follows the same
-   **standing 6-step workflow** (see
-   [[feedback_telegram_clock_alert_bot_workflow]], mirroring the sibling
-   bots' workflow, minus any Google-Cloud-console step since this project
-   has none):
-   1. Edit the code (`bot.py`/`README.md`).
-   2. `git commit` + `git push` (telegram-clock-alert-bot repo).
-   3. Confirm Render picked up the new commit and redeployed cleanly (check
-      the Render dashboard's Deploy/Logs tab) — pushing to GitHub does not
-      by itself mean the live bot is running the new code. **Also note**:
-      a redeploy clears `active_reminders` — any reminders in flight at
-      that moment are lost, which is expected/acceptable for this project.
+3. If asked to continue development, every change follows this
+   **standing 5-step workflow**:
+   1. Edit the code (`bot.py`/`README.md`, keep `USAGE_TEXT` in sync),
+      `python3 -m py_compile bot.py`.
+   2. Commit + push to the session's branch, then (with the user's OK)
+      fast-forward `master`. `master` is always what the desktop runs.
+   3. Tell the user to update the desktop, in an administrator PowerShell
+      in `C:\telegram-clock-alert-bot`:
+      ```powershell
+      git pull
+      Stop-ScheduledTask -TaskName "TelegramClockAlertBot"
+      Get-CimInstance Win32_Process -Filter "Name='python.exe'" | Where-Object { $_.CommandLine -like '*bot.py*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
+      Start-ScheduledTask -TaskName "TelegramClockAlertBot"
+      ```
+      then send `/help` to confirm the new version. Restarting clears
+      in-flight reminders.
    4. Add a new `ENTRIES` item to telegram-clock-alert-bot-history's
-      `index.html` (translated to plain Traditional Chinese), then
-      commit/push/republish that repo's Artifact.
-   5. Update this skill file (`SKILL.md`) with whatever changed, and sync
-      `SKILL-backup.md` in the telegram-clock-alert-bot repo (commit+push)
-      so the disaster-recovery backup copy doesn't drift.
-   6. Update memory (`[[project_telegram_clock_alert_bot]]` and any other
-      relevant memory file) with what changed and why.
+      `index.html` (plain Traditional Chinese), commit/push to its
+      `master`, and republish its Artifact:
+      https://claude.ai/artifact/CCetjwWe42F1yiqMhYpybg
+   5. Update this `SKILL-backup.md` (commit + push). If the second
+      desktop's CLI is still used, copy it to
+      `.claude/skills/telegram-clock-alert-bot/SKILL.md` there too.
