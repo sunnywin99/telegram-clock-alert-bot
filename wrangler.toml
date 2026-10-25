@@ -1,0 +1,23 @@
+name = "telegram-clock-alert-bot"
+main = "src/index.js"
+compatibility_date = "2026-09-15"
+workers_dev = true
+
+[vars]
+# 只處理這個 Telegram user id 的訊息（不是機密，機密的 Bot Token 放在 Cloudflare 後台的 Secret）
+ALLOWED_TELEGRAM_USER_ID = "8735906224"
+
+# 保險用：alarm 平常就會準時觸發，cron 每 5 分鐘再確認一次沒有漏掉
+[triggers]
+crons = ["*/5 * * * *"]
+
+[[durable_objects.bindings]]
+name = "REMINDERS"
+class_name = "ReminderStore"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["ReminderStore"]
+
+[observability]
+enabled = true
