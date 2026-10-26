@@ -73,7 +73,7 @@ push 到 GitHub 的 `master` 後，Cloudflare 會自動部署新版本。
    其他設定都用預設值（Cloudflare 會讀 `wrangler.toml`），按 **Deploy**。
 3. 部署完成後，到這個 Worker 的 **Settings → Variables and Secrets** → **Add**：
    類型選 **Secret**，名稱 `TELEGRAM_BOT_TOKEN`，值貼上 Bot Token，存檔。
-4. 打開 `https://<worker 網址>/setup`（網址在 Worker 頁面上，結尾是 `.workers.dev`），
+4. 打開 `https://telegram-clock-alert-bot.sunnywin99.workers.dev/setup`，
    看到「設定完成！」就代表 Telegram 已經改成把訊息送到這個 Worker。
 5. 在 Telegram 傳 `/help`，再傳「測試 1」，約 1 分鐘後應該收到提醒，回「測試 完成」停止。
 

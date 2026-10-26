@@ -26,7 +26,7 @@ but **the only one with no Google Cloud/OAuth dependency at all**.
     (Worker → Settings → Variables and Secrets). `ALLOWED_TELEGRAM_USER_ID`
     (`8735906224`) is a plain var in `wrangler.toml`.
   - After the first deploy (or if the bot stops responding) open
-    `https://<worker>.workers.dev/setup` — it checks the token with `getMe`
+    `https://telegram-clock-alert-bot.sunnywin99.workers.dev/setup` — it checks the token with `getMe`
     and registers the Telegram webhook.
 - History: Python + python-telegram-bot long-polling on Render free tier
   (2026-08-27, UptimeRobot keep-alive) → Render's 750hr/month pool ran out →
