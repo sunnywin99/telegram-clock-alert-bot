@@ -86,10 +86,6 @@ export class ReminderStore extends DurableObject {
     const state = await this.loadState();
     const outgoing = [];
 
-    // 一次性清理（2026-11-25）：使用者要求移除誤設、一直在催的「地」提醒。
-    // 確認刪掉之後，下一個 commit 會拿掉這段，以免以後真的要設「地」這個名稱時被誤刪。
-    delete state.reminders["地"];
-
     // 第一次執行時從現在開始算，不補發部署之前的每日提醒
     const cursor = state.dailyCursor ?? now;
     for (const slot of dailySlotsBetween(cursor, now)) {
